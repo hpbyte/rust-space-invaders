@@ -2,9 +2,9 @@ use std::error::Error;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use crossterm::event::{Event, KeyCode};
-use rusty_audio::Audio;
 use space_invaders::frame::{self, Drawable};
 use space_invaders::frame::new_frame;
+use space_invaders::invaders::Invaders;
 use space_invaders::player::Player;
 use space_invaders::render;
 use std::{io, thread};
@@ -13,16 +13,9 @@ use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::cursor::{Hide, Show};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut audio = Audio::new();
+    // TODO: add audios
 
-    audio.add("explode", "sounds/explode.wav");
-    audio.add("lose", "sounds/lose.wav");
-    audio.add("move", "sounds/move.wav");
-    audio.add("pew", "sounds/pew.wav");
-    audio.add("startup", "sounds/startup.wav");
-    audio.add("win", "sounds/win.wav");
-
-    audio.play("startup");
+    // TODO: audio.play("startup");
 
     // terminal
     let mut stdout = io::stdout();
@@ -49,6 +42,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // game loop
     let mut player = Player::new();
     let mut instant = Instant::now();
+    let mut invaders = Invaders::new();
     'gameloop: loop {
         // per-frame init
         let delta = instant.elapsed();
@@ -63,11 +57,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                     KeyCode::Right => player.move_right(),
                     KeyCode::Char(' ') | KeyCode::Enter => {
                         if player.shoot() {
-                            audio.play("pew");
+                            // TODO: audio.play("shoot");
                         }
                     },
                     KeyCode::Esc | KeyCode::Char('q') => {
-                        audio.play("lose");
                         break 'gameloop;
                     },
                     _ => {},
@@ -77,17 +70,35 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         // updates
         player.update(delta);
+        if invaders.update(delta) {
+            // TODO: audio.play("move");
+        }
+        if player.detect_hits(&mut invaders) {
+            // TODO: audio.play("explode");
+        }
 
         // draw & render
-        player.draw(&mut curr_frame);
+        let drawables: Vec<&dyn Drawable> = vec![&player, &invaders];
+        for drawable in drawables {
+            drawable.draw(&mut curr_frame);
+        }
         let _ = render_tx.send(curr_frame);
         thread::sleep(Duration::from_millis(1));
+
+        // win or lose
+        if invaders.all_killed() {
+            // TODO: audio.play("win");
+            break 'gameloop;
+        }
+        if invaders.reached_bottom() {
+            // TODO: audio.play("lose");
+            break 'gameloop;
+        }
     }
     
     // cleanup
     drop(render_tx);
     render_handle.join().unwrap();
-    audio.wait();
     stdout.execute(Show)?;
     stdout.execute(LeaveAlternateScreen)?;
     terminal::disable_raw_mode()?;
